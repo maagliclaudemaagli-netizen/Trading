@@ -1,37 +1,64 @@
-# Engulfing + SMA50 backtest (H1)
+# Backtest de la stratégie institutionnelle SMC / ICT
 
-> ⚠️ Sur ~2,8 ans de données H1, la stratégie était **perdante** (PF 0.91, −130 R sur 2108 trades).
-> Ce dépôt est un outil de recherche, pas un système à trader.
+Ce dépôt contient un moteur Python de recherche et de backtest pour la
+stratégie institutionnelle décrite dans [INSTITUTIONAL.md](INSTITUTIONAL.md).
+Il ne constitue pas un système de trading prêt à l'emploi.
 
-## Règles
-| Règle | Valeur |
-|---|---|
-| Unité de temps | H1 |
-| Actifs | EURUSD, GBPUSD, USDJPY |
-| Achat | bougie haussière dont le corps englobe le corps baissier précédent, clôture > SMA50 |
-| Vente | symétrique, clôture < SMA50 |
-| Entrée | ouverture de la bougie suivante (+ coût) |
-| Stop Loss | 1.5 × ATR(14) |
-| Take Profit | 2 × risque (R:R 1:2) |
-| Gestion | 1 position à la fois, 1 % de risque, SL prioritaire si SL et TP dans la même bougie, sortie à l'open en cas de gap |
+## Principe
 
-Tous les réglages sont en tête de `strategy.py`.
+La combinaison intraday utilisée par défaut associe la liquidité Daily, la
+confirmation H1 et la clôture de validation H4. Le moteur recherche, dans
+l'ordre, un contact avec une zone interne, une cassure de structure, au moins
+deux zones opposées invalidées et deux zones créées dans le sens du mouvement.
+La validation attend une clôture directionnelle au-delà du niveau clé.
 
-## Structure
-| Fichier | Rôle |
-|---|---|
-| `strategy.py` | règles + moteur : `load_csv`, `compute_atr`, `detect_engulfing`, `signals`, `backtest`, `stats` |
-| `run.py` | backtest de tous les actifs, résumé, export `data/trades.csv` |
-| `fetch_dukascopy_h1.py` | télécharge 10 ans de H1 depuis Dukascopy (via `curl`) → `data/<PAIR>_H1.csv` |
-| `test_strategy.py` | tests unitaires (13) |
-| `_archive/` | anciennes versions (SMC, sweep, optimiseur Optuna…) |
+L'entrée attend un repli sur une zone créée ; le stop est structurel et la
+cible correspond à une liquidité externe. Les règles sont symétriques pour
+les achats et les ventes. Les définitions opérationnelles, les limites des
+données OHLC et les deux autres combinaisons fractales sont détaillées dans
+[INSTITUTIONAL.md](INSTITUTIONAL.md).
 
-`run.py` lit `data/<PAIR>_H1.csv` (source unique : Dukascopy). Horodatages en UTC (Paris = UTC+1 l'hiver, UTC+2 l'été).
-Format CSV attendu : `timestamp, open, high, low, close[, volume]` (UTC).
+## Organisation
 
-## Commandes
+- [institutional/](institutional/) : données, zones, stratégie et backtest.
+- [INSTITUTIONAL.md](INSTITUTIONAL.md) : conventions et protocole exécuté.
+- [requirements.txt](requirements.txt) : dépendances Python.
+- [tests/](tests/) : tests de régression sur données synthétiques.
+
+## Installation
+
+```bash
+python3 -m venv .venv
+.venv/bin/python -m pip install -r requirements.txt
 ```
-.venv/bin/python fetch_dukascopy_h1.py --years 10    # données Dukascopy (long)
-.venv/bin/python run.py                              # backtest
-.venv/bin/python -m pytest -q                        # tests
+
+## Utilisation
+
+Fournir un fichier local de bougies M5 OANDA, horodatées en UTC, avec les
+colonnes `timestamp,open,high,low,close,volume` ; `time` en secondes Unix peut
+remplacer `timestamp`. Aucun téléchargement n'est effectué automatiquement.
+Les données de marché ne sont pas incluses dans le répertoire du projet.
+
+```bash
+.venv/bin/python -m institutional \
+  --csv chemin/vers/EURUSD_M5.csv \
+  --pair EURUSD \
+  --output reports/institutional.json
 ```
+
+Le rapport JSON est accompagné des fichiers `institutional.trades.csv` et
+`institutional.audit.csv`. Le dossier de sortie est créé lors de l'exécution.
+Les données locales et les rapports générés ne sont pas versionnés.
+
+## Vérifications
+
+```bash
+.venv/bin/python -B -m institutional --help
+.venv/bin/python -B -m unittest discover -s tests -v
+```
+
+Les tests utilisent uniquement des données synthétiques et ne mesurent pas
+la rentabilité sur le marché.
+
+Les résultats d'un backtest dépendent des données et des conventions de
+simulation et ne garantissent pas la rentabilité future.
