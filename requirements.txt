@@ -1,4 +1,6 @@
 pandas
 numpy
 pyarrow
-v20
+requests>=2.31,<3
+streamlit>=1.40,<2
+pytest>=8,<10

@@ -91,7 +91,7 @@ class InstitutionalTests(unittest.TestCase):
             csv = Path(directory) / "synthetic_m5.csv"
             output = Path(directory) / "reports" / "institutional.json"
             data.to_csv(csv)
-            loaded = load_m5(csv, None, None, None)
+            loaded = load_m5(csv, None, None)
             pd.testing.assert_frame_equal(data, loaded, check_freq=False)
             process = run_cli("--csv", str(csv), "--output", str(output))
             self.assertEqual(process.returncode, 0, process.stderr)
@@ -122,6 +122,13 @@ class InstitutionalTests(unittest.TestCase):
             self.assertEqual(process.returncode, 1)
             self.assertIn("Backtest failed:", process.stderr)
             self.assertEqual(process.stdout, "")
+            self.assertFalse(output.exists())
+
+    def test_removed_cache_source_is_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / "institutional.json"
+            process = run_cli("--cache", directory, "--output", str(output))
+            self.assertEqual(process.returncode, 2)
             self.assertFalse(output.exists())
 
 

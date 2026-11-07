@@ -3,7 +3,6 @@ from __future__ import annotations
 
 import argparse
 import json
-import re
 from dataclasses import asdict
 from pathlib import Path
 
@@ -21,30 +20,12 @@ def utc(value: str) -> pd.Timestamp:
     return timestamp.tz_localize("UTC") if timestamp.tz is None else timestamp.tz_convert("UTC")
 
 
-def load_m5(csv: Path | None, cache: Path | None, start: str | None, end: str | None) -> pd.DataFrame:
+def load_m5(csv: Path, start: str | None, end: str | None) -> pd.DataFrame:
     first, last = utc(start) if start else None, utc(end) if end else None
     if first is not None and last is not None and first >= last:
         raise ValueError("start must precede end")
-    if csv is not None:
-        raw = pd.read_csv(csv, float_precision="round_trip")
-        raw.columns = [c.strip().lower() for c in raw.columns]
-    elif cache is not None:
-        paths = []
-        for path in sorted(cache.glob("*.parquet")):
-            match = re.search(r"_5_(\d{4}-\d{2})-\d{2}_to_", path.name)
-            if match is None:
-                raise ValueError(f"Unrecognized OANDA M5 filename: {path.name}")
-            month = match.group(1)
-            if first is not None and month < first.strftime("%Y-%m"):
-                continue
-            if last is not None and month > last.strftime("%Y-%m"):
-                continue
-            paths.append(path)
-        if not paths:
-            raise ValueError(f"No M5 parquet files in {cache}")
-        raw = pd.concat([pd.read_parquet(p) for p in paths], ignore_index=True)
-    else:
-        raise ValueError("Provide --csv or --cache")
+    raw = pd.read_csv(csv, float_precision="round_trip")
+    raw.columns = [c.strip().lower() for c in raw.columns]
     if "timestamp" in raw:
         raw["timestamp"] = pd.to_datetime(raw.timestamp, utc=True)
         frame = raw.set_index("timestamp")
@@ -62,9 +43,7 @@ def load_m5(csv: Path | None, cache: Path | None, start: str | None, end: str | 
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    source = parser.add_mutually_exclusive_group(required=True)
-    source.add_argument("--csv", type=Path)
-    source.add_argument("--cache", type=Path, help="Local OANDA M5 parquet directory; no network")
+    parser.add_argument("--csv", type=Path, required=True, help="Local Dukascopy M5 CSV export")
     parser.add_argument("--pair", default="EURUSD")
     parser.add_argument("--start", help="Inclusive UTC date")
     parser.add_argument("--end", help="Exclusive UTC date")
@@ -74,12 +53,12 @@ def main() -> None:
     parser.add_argument("--output", type=Path, required=True, help="JSON report; sibling trades/audit CSV")
     args = parser.parse_args()
     try:
-        data = load_m5(args.csv, args.cache, args.start, args.end)
+        data = load_m5(args.csv, args.start, args.end)
         config = StrategyConfig(args.alignment)
         execution = ExecutionConfig(pair=args.pair, price_basis=args.price_basis)
         result = backtest(data, config, execution)
         report = {
-            "source": str(args.csv or args.cache),
+            "source": str(args.csv),
             "first_open": str(data.index[0]), "last_open": str(data.index[-1]), "m5_bars": len(data),
             "data_sha256": data_fingerprint(data),
             "strategy": asdict(config), "execution": asdict(execution), "metrics": result.metrics,

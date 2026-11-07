@@ -2,25 +2,26 @@
 
 Le seul moteur actif est [institutional/](institutional/). Il ne contient pas
 de filtre DBS, OTE, sweep, killzone, ATR, RR fixe ou nombre de mitigations.
-Le depot contient uniquement ce moteur, ses dependances, sa documentation
-et ses tests de regression sur donnees synthetiques.
+Le depot contient ce moteur, le moteur de donnees Dukascopy, leurs
+dependances, leur documentation et leurs tests de regression synthetiques.
 
 ## Utilisation
 
 Dependances : `pandas`, `numpy`, `pyarrow` dans [requirements.txt](requirements.txt).
 
 ```bash
-.venv/bin/python -m institutional --cache chemin/vers/oanda/EURUSD_M5 \
-  --start 2024-01-01 --end 2026-01-01 \
-  --output reports/institutional.json
-
-.venv/bin/python -m institutional --csv chemin/vers/EURUSD_M5.csv \
+.venv/bin/python main.py download --pair EURUSD --timeframe M5 \
+  --start 2025-01-06 --end 2025-01-06
+.venv/bin/python main.py export --pair EURUSD --timeframe M5 \
+  --side bid --output data/exports/EURUSD_M5_bid.csv
+.venv/bin/python -m institutional --csv data/exports/EURUSD_M5_bid.csv \
+  --pair EURUSD --price-basis bid \
   --output reports/institutional.json
 ```
 
-Les donnees de marche ne sont pas incluses dans le repertoire du projet :
-fournir un CSV ou un cache OANDA local. Le cache est lu hors ligne ; aucun
-telechargement n'est declenche.
+Les donnees de marche ne sont pas incluses dans le depot versionne.
+Le backtest lit un CSV local exporte depuis Dukascopy ; il ne declenche
+aucun telechargement.
 CSV : `timestamp,open,high,low,close,volume`, ou `time` en secondes Unix.
 Les lignes doivent etre des M5 cloturees, triees, uniques, avec OHLC coherents.
 `--end` est exclusif. Les dates sans fuseau sont interpretees en UTC.
@@ -33,7 +34,7 @@ Les lignes doivent etre des M5 cloturees, triees, uniques, avec OHLC coherents.
   validation par cloture et signal avec trace des identifiants.
 - [backtest.py](institutional/backtest.py) : ordres limites, spread, stops
   structurels, sorties, equity et metriques de performance.
-- [__main__.py](institutional/__main__.py) : CSV/cache et rapports JSON/CSV.
+- [__main__.py](institutional/__main__.py) : import CSV et rapports JSON/CSV.
 - [tests/](tests/) : regression des metriques, du resampling et des exports.
 
 ## Hierarchies autorisees
